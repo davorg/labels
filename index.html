@@ -48,7 +48,7 @@
   .label{width:var(--label-w); height:var(--label-h); box-sizing:border-box; border:1px dashed transparent; border-radius:4mm; display:flex; align-items:center; justify-content:center; padding:0 4mm; position:relative;}
   .label.show-guides{border-color:#e5e7eb}
   .bar{position:absolute; inset:0; border-radius:4mm; opacity:.18}
-  .content{position:relative; text-align:center;}
+  .content{position:relative; text-align:center; width:100%;}
   .name{font-weight:700; font-size:14pt; line-height:1.05}
   .region{font-size:9pt; color:#374151}
   .ribbon{position:absolute; top:6px; right:-14px; transform:rotate(45deg); background:#ef4444; color:#fff; font-size:10px; font-weight:700; padding:4px 22px; box-shadow:0 2px 6px rgba(0,0,0,.15)}
@@ -68,6 +68,9 @@
   .regions .del{color:#ef4444; border-color:#fecaca}
   .scroll{max-height:280px; overflow:auto; border:1px dashed #e5e7eb; border-radius:10px; padding:10px}
   .small{font-size:12px}
+  .region-wrap{margin-top:3mm; position:relative; width:100%;}
+  .region-stripe{width:100%; border-radius:6px;}
+  .region-text{position:absolute; left:0; right:0; top:0; font-weight:700; color:#111827; text-align:center; font-size:9pt;}
 </style>
 </head>
 <body>
@@ -168,12 +171,16 @@
 
   // Default region colours
   let regionColours = {
-    "Indian": "#f59e0b",
-    "Middle Eastern": "#ef4444",
-    "North African": "#10b981",
-    "East Asian": "#3b82f6",
-    "European": "#a855f7",
-    "Latin American": "#f97316",
+    "East Africa": "#B22222",
+    "East Asia": "#00A86B",
+    "Eastern Europe": "#6A1B4D",
+    "Latin America": "#E63946",
+    "Mediterranean": "#808000",
+    "MENA": "#A0522D",
+    "North America": "#FF5722",
+    "North/West Europe": "#5D4037",
+    "South Asia": "#FFC300",
+    "Universal": "#F5DEB3",
     "Other": "#94a3b8"
   };
 
@@ -187,6 +194,7 @@
   function parseInput(text){
     const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
     const out = [];
+    const HEX_RE = /^#?[0-9a-fA-F]{6}$/;
     for(const line of lines){
       let name='', region='', blend='no';
       // CSV or pipe‑separated
@@ -195,9 +203,14 @@
         name = parts[0]; region='Other'; blend='no';
       }else{
         [name, region, blend] = [parts[0]||'', parts[1]||'Other', (parts[2]||'no')];
+        if(HEX_RE.test(parts[2]||'')){
+          const hex = parts[2].startsWith('#') ? parts[2] : ('#'+parts[2]);
+          blend = parts[3]||'no';
+          if(region){ regionColours[region] = hex; }
+        }
       }
       if(!name) continue;
-      out.push({ name, region, blend: /^(y|yes|true|1)$/i.test(blend) });
+      out.push({ name, region, blend: /^(y|yes|true|1|x|✓|✔)$/i.test(String(blend||'')) });
       // Seed region colour if unknown
       if(region && !(region in regionColours)) regionColours[region] = '#94a3b8';
     }
@@ -297,20 +310,36 @@
         content.className = 'content';
         const name = document.createElement('div');
         name.className = 'name';
-        name.style.fontSize = (parseInt(el('#fontSize').value)||14) + 'pt';
+        const fs = (parseInt(el('#fontSize').value)||14);
+        name.style.fontSize = fs + 'pt';
         name.textContent = el('#uppercase').checked ? item.name.toUpperCase() : item.name;
         content.appendChild(name);
+        const stripeH = Math.max(16, Math.round(fs * 1.1));
         if(el('#showRegion').checked){
-          const region = document.createElement('div');
-          region.className = 'region';
-          region.textContent = item.region;
           const col = regionColours[item.region] || '#94a3b8';
-          region.style.position = 'relative';
-          region.style.zIndex = '1';
-          region.style.color = '#111827';
-          region.style.fontWeight = '600';
-          region.style.boxShadow = 'inset 0 -8px 0 0 ' + col;
-          content.appendChild(region);
+          const wrap = document.createElement('div');
+          wrap.className = 'region-wrap';
+          const stripe = document.createElement('div');
+          stripe.className = 'region-stripe';
+          stripe.style.height = stripeH + 'px';
+          stripe.style.background = col;
+          wrap.appendChild(stripe);
+          const rtext = document.createElement('div');
+          rtext.className = 'region-text';
+          rtext.style.lineHeight = stripeH + 'px';
+          rtext.textContent = item.region;
+          wrap.appendChild(rtext);
+          content.appendChild(wrap);
+        } else {
+          const col = regionColours[item.region] || '#94a3b8';
+          const wrap = document.createElement('div');
+          wrap.className = 'region-wrap';
+          const stripe = document.createElement('div');
+          stripe.className = 'region-stripe';
+          stripe.style.height = stripeH + 'px';
+          stripe.style.background = col;
+          wrap.appendChild(stripe);
+          content.appendChild(wrap);
         }
         label.appendChild(content);
         if(item.blend){
@@ -322,6 +351,15 @@
         }
         canvas.appendChild(label);
       });
+
+      // Fill placeholders so each row is complete
+      const needed = perSheet - page.length;
+      for(let i=0;i<needed;i++){
+        const ph = document.createElement('div');
+        ph.className = 'label';
+        if(el('#showGuides').checked) ph.classList.add('show-guides');
+        canvas.appendChild(ph);
+      }
 
       sheetsBox.appendChild(sheet);
     });
