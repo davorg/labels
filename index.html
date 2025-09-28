@@ -46,7 +46,7 @@
   .sheet{--cols:3; --rows:7; --label-w:63.5mm; --label-h:38.1mm; --h-gap:3mm; --v-gap:1mm; --page-mx:7.5mm; --page-my:12mm; width:210mm; height:297mm; background:white; margin:0 auto; position:relative; box-shadow:0 0 0 1px #e5e7eb inset}
   .canvas{position:absolute; left:var(--page-mx); top:var(--page-my); right:var(--page-mx); bottom:var(--page-my); display:grid; grid-template-columns: repeat(var(--cols), var(--label-w)); grid-auto-rows: var(--label-h); gap: var(--v-gap) var(--h-gap);}
 
-  .label{width:var(--label-w); height:var(--label-h); box-sizing:border-box; border:1px dashed transparent; border-radius:4mm; display:flex; align-items:center; justify-content:center; padding:0 4mm; position:relative;}
+  .label{width:var(--label-w); height:var(--label-h); box-sizing:border-box; border:1px dashed transparent; border-radius:4mm; display:flex; align-items:center; justify-content:center; padding:0 4mm; position:relative; overflow:hidden !important;}
   .label.show-guides{border-color:#e5e7eb}
   .bar{position:absolute; inset:0; border-radius:4mm; opacity:.18}
   .content{position:relative; text-align:center; width:100%;}
@@ -115,9 +115,7 @@
           <label>Font size
             <input type="number" id="fontSize" min="8" max="24" value="14" /> pt
           </label>
-          <label>Bar opacity
-            <input type="number" id="barOpacity" min="0" max="1" step="0.05" value="0.18" />
-          </label>
+          <label><input type="checkbox" id="autoFont" checked /> Auto size (by label height)</label>
         </div>
         <div class="row">
           <label>Label width (mm)
@@ -269,13 +267,11 @@
     const pageW = 210 - (mx*2);
     const pageH = 297 - (my*2);
 
-    // Slight epsilon to avoid off-by-one undercounts due to FP
     const eps = 1e-6;
     const cols = Math.max(1, Math.floor((pageW + hgap + eps) / (w + hgap)));
     const rows = Math.max(1, Math.floor((pageH + vgap + eps) / (h + vgap)));
 
-    document.documentElement.style.setProperty('--cols', cols);
-    document.documentElement.style.setProperty('--rows', rows);
+    // Also keep root vars in sync for any global UI that references them
     document.documentElement.style.setProperty('--label-w', mm(w));
     document.documentElement.style.setProperty('--label-h', mm(h));
     document.documentElement.style.setProperty('--h-gap', mm(hgap));
@@ -283,7 +279,7 @@
     document.documentElement.style.setProperty('--page-mx', mm(mx));
     document.documentElement.style.setProperty('--page-my', mm(my));
 
-    return {cols, rows};
+    return {cols, rows, w, h, hgap, vgap, mx, my};
   }
 
   function chunk(arr, size){
@@ -294,7 +290,8 @@
     const sheetsBox = el('#sheets');
     sheetsBox.innerHTML = '';
 
-    const {cols, rows} = computeGrid();
+    const cfg = computeGrid();
+    const {cols, rows, w, h, hgap, vgap, mx, my} = cfg;
     const perSheet = cols * rows;
     const items = state.items;
     el('#count').textContent = items.length;
@@ -303,6 +300,15 @@
     pages.forEach(page => {
       const sheet = document.createElement('div');
       sheet.className = 'sheet';
+      // IMPORTANT: bind sizing vars to *this* sheet so our inputs override the class defaults
+      sheet.style.setProperty('--cols', cols);
+      sheet.style.setProperty('--rows', rows);
+      sheet.style.setProperty('--label-w', mm(w));
+      sheet.style.setProperty('--label-h', mm(h));
+      sheet.style.setProperty('--h-gap', mm(hgap));
+      sheet.style.setProperty('--v-gap', mm(vgap));
+      sheet.style.setProperty('--page-mx', mm(mx));
+      sheet.style.setProperty('--page-my', mm(my));
       const canvas = document.createElement('div');
       canvas.className = 'canvas';
       sheet.appendChild(canvas);
@@ -317,7 +323,7 @@
         content.className = 'content';
         const name = document.createElement('div');
         name.className = 'name';
-        const fs = (parseInt(el('#fontSize').value)||14);
+        const auto = el('#autoFont').checked; const fs = auto ? Math.max(8, Math.min(14, Math.round(cfg.h * 2.83465 * 0.18))) : (parseInt(el('#fontSize').value)||14); if(el('#fontSize')) el('#fontSize').disabled = auto;
         name.style.fontSize = fs + 'pt';
         name.textContent = el('#uppercase').checked ? item.name.toUpperCase() : item.name;
         content.appendChild(name);
@@ -389,7 +395,6 @@
   el('#showRegion').addEventListener('change', render);
   el('#uppercase').addEventListener('change', render);
   el('#fontSize').addEventListener('input', render);
-  el('#barOpacity').addEventListener('input', render);
   ;['w','h','hgap','vgap','mx','my'].forEach(id=> el('#'+id).addEventListener('input', render));
 
   el('#addRegion').addEventListener('click', ()=>{
@@ -406,6 +411,8 @@
   });
 
   el('#printBtn').addEventListener('click', ()=>{ window.print(); });
+  // Auto font toggle
+  if(el('#autoFont')) el('#autoFont').addEventListener('change', render);
 
   // Sample dataset (roughly 30 to get you started; paste your 54 to replace)
   const SAMPLE = `Cumin, South Asia, no
@@ -439,9 +446,16 @@ Nutmeg, Universal, no
 Cloves, East Africa, no
 Black Pepper, South Asia, no`;
 
-  el('#loadSample').addEventListener('click', ()=>{
-    el('#input').value = SAMPLE; el('#parse').click();
-  });
+  const loadBtn = el('#loadSample');
+  if(loadBtn){
+    loadBtn.addEventListener('click', ()=>{
+      el('#input').value = SAMPLE;
+      // immediately parse & render so it works even without the button
+      state.items = parseInput(el('#input').value);
+      renderRegionList();
+      render();
+    });
+  }
 
   // Initial render
   renderRegionList();
