@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
 <title>Spice Label Maker — Avery A4 (UK)</title>
 <style>
   :root{
@@ -49,7 +50,7 @@
   .label.show-guides{border-color:#e5e7eb}
   .bar{position:absolute; inset:0; border-radius:4mm; opacity:.18}
   .content{position:relative; text-align:center; width:100%;}
-  .name{font-weight:700; font-size:14pt; line-height:1.05}
+  .name{font-family:"League Spartan","Manrope",system-ui; font-weight:800; font-size:14pt; line-height:1.05}
   .region{font-size:9pt; color:#374151}
   .ribbon{position:absolute; top:6px; right:-14px; transform:rotate(45deg); background:#ef4444; color:#fff; font-size:10px; font-weight:700; padding:4px 22px; box-shadow:0 2px 6px rgba(0,0,0,.15)}
   .blend-outline{position:absolute; inset:0; border-radius:4mm; border:2px dotted #ef4444; pointer-events:none}
@@ -188,6 +189,8 @@
 
   // Helpers
   const el = (sel, p=document) => p.querySelector(sel);
+  // util: debounce
+  const debounce = (fn, ms=250) => { let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); }; };
   const els = (sel, p=document) => [...p.querySelectorAll(sel)];
   const mm = v => v.toFixed(2) + 'mm';
 
@@ -371,6 +374,11 @@
     renderRegionList();
     render();
   });
+  // Live parse as you type (debounced)
+  el('#input').addEventListener('input', debounce(()=>{
+    state.items = parseInput(el('#input').value);
+    render();
+  }, 250));
 
   el('#preset').addEventListener('change', render);
   el('#showGuides').addEventListener('change', render);
@@ -396,7 +404,36 @@
   el('#printBtn').addEventListener('click', ()=>{ window.print(); });
 
   // Sample dataset (roughly 30 to get you started; paste your 54 to replace)
-  const SAMPLE = `Cumin, Indian, no\nTurmeric, Indian, no\nGaram Masala, Indian, yes\nCoriander Seed, Indian, no\nFenugreek, Indian, no\nCardamom, Indian, no\nCinnamon, Middle Eastern, no\nSumac, Middle Eastern, no\nZa'atar, Middle Eastern, yes\nBaharat, Middle Eastern, yes\nRas el Hanout, North African, yes\nHarissa, North African, yes\nPaprika (Sweet), European, no\nSmoked Paprika, European, no\nHerbes de Provence, European, yes\nOregano, European, no\nBasil, European, no\nThyme, European, no\nChinese Five Spice, East Asian, yes\nSichuan Pepper, East Asian, no\nStar Anise, East Asian, no\nGochugaru, East Asian, no\nAncho Chilli, Latin American, no\nChipotle, Latin American, no\nMexican Oregano, Latin American, no\nMixed Spice, Other, yes\nAllspice, Other, no\nNutmeg, Other, no\nCloves, Other, no\nBlack Pepper, Other, no`;
+  const SAMPLE = `Cumin, South Asia, no
+Turmeric, South Asia, no
+Garam Masala, South Asia, yes
+Coriander Seed, South Asia, no
+Fenugreek, South Asia, no
+Cardamom, South Asia, no
+Cinnamon, MENA, no
+Sumac, MENA, no
+Za'atar, MENA, yes
+Baharat, MENA, yes
+Ras el Hanout, MENA, yes
+Harissa, MENA, yes
+Paprika (Sweet), Eastern Europe, no
+Smoked Paprika, Eastern Europe, no
+Herbes de Provence, North/West Europe, yes
+Oregano, Mediterranean, no
+Basil, Mediterranean, no
+Thyme, Mediterranean, no
+Chinese Five Spice, East Asia, yes
+Sichuan Pepper, East Asia, no
+Star Anise, East Asia, no
+Gochugaru, East Asia, no
+Ancho Chilli, Latin America, no
+Chipotle, Latin America, no
+Mexican Oregano, Latin America, no
+Mixed Spice, Universal, yes
+Allspice, Universal, no
+Nutmeg, Universal, no
+Cloves, East Africa, no
+Black Pepper, South Asia, no`;
 
   el('#loadSample').addEventListener('click', ()=>{
     el('#input').value = SAMPLE; el('#parse').click();
