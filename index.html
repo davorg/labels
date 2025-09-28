@@ -259,16 +259,20 @@
   }
 
   function computeGrid(){
-    const get = id => parseFloat(el('#'+id).value);
-    const w = get('w')||63.5, h = get('h')||38.1;
-    const hgap = get('hgap')||3, vgap = get('vgap')||1;
-    const mx = get('mx')||7.5, my = get('my')||12;
+    const w = parseFloat(el('#w').value)||63.5;
+    const h = parseFloat(el('#h').value)||38.1;
+    const hgap = parseFloat(el('#hgap').value)||3;
+    const vgap = parseFloat(el('#vgap').value)||1;
+    const mx = parseFloat(el('#mx').value)||10;
+    const my = parseFloat(el('#my').value)||10;
 
     const pageW = 210 - (mx*2);
     const pageH = 297 - (my*2);
 
-    const cols = Math.max(1, Math.floor((pageW + hgap) / (w + hgap)));
-    const rows = Math.max(1, Math.floor((pageH + vgap) / (h + vgap)));
+    // Slight epsilon to avoid off-by-one undercounts due to FP
+    const eps = 1e-6;
+    const cols = Math.max(1, Math.floor((pageW + hgap + eps) / (w + hgap)));
+    const rows = Math.max(1, Math.floor((pageH + vgap + eps) / (h + vgap)));
 
     document.documentElement.style.setProperty('--cols', cols);
     document.documentElement.style.setProperty('--rows', rows);
