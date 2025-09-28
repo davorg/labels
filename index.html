@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spice Label Maker — Avery A4 (UK)</title>
+<style>
+  :root{
+    --brand:#111827;
+    --ink:#111827;
+    --sub:#6b7280;
+    --bg:#f8fafc;
+    --card:#ffffff;
+    --accent:#0ea5e9;
+  }
+  html,body{height:100%;}
+  body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+       background:var(--bg); color:var(--ink); margin:0;}
+  header{position:sticky; top:0; z-index:10; backdrop-filter: blur(6px); background:rgba(248,250,252,.85); border-bottom:1px solid #e5e7eb}
+  .wrap{max-width:1100px; margin:0 auto; padding:16px;}
+  h1{font-size:clamp(20px,3.2vw,28px); margin:8px 0 4px}
+  .sub{color:var(--sub); font-size:14px}
+
+  .grid{display:grid; grid-template-columns: 1.2fr .8fr; gap:16px; margin-top:12px}
+  @media (max-width: 880px){ .grid{grid-template-columns: 1fr;}}
+
+  .card{background:var(--card); border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 1px 2px rgba(0,0,0,.03);}
+  .card .hd{padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between}
+  .card .bd{padding:16px}
+  .card h2{margin:0; font-size:16px}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .row + .row{margin-top:10px}
+  label{font-size:13px; color:#374151}
+  input[type="text"], input[type="number"], select, textarea{border:1px solid #d1d5db; border-radius:10px; padding:10px 12px; font:inherit; background:#fff; color:inherit}
+  textarea{width:100%; min-height:160px}
+  .btn{appearance:none; border:1px solid #cbd5e1; background:#fff; color:#111827; padding:10px 14px; border-radius:12px; cursor:pointer}
+  .btn.primary{background:#111827; color:#fff; border-color:#111827}
+  .btn.ghost{background:transparent}
+  .btn:active{transform: translateY(1px)}
+  .note{font-size:12px; color:#6b7280}
+  .pill{font-size:12px; border:1px solid #e5e7eb; border-radius:999px; padding:2px 8px;}
+
+  /* Label sheet preview */
+  .sheet-preview{background:#f1f5f9; border-radius:12px; padding:12px; overflow:auto}
+  .sheet{--cols:3; --rows:7; --label-w:63.5mm; --label-h:38.1mm; --h-gap:3mm; --v-gap:1mm; --page-mx:7.5mm; --page-my:12mm; width:210mm; height:297mm; background:white; margin:0 auto; position:relative; box-shadow:0 0 0 1px #e5e7eb inset}
+  .canvas{position:absolute; left:var(--page-mx); top:var(--page-my); right:var(--page-mx); bottom:var(--page-my); display:grid; grid-template-columns: repeat(var(--cols), var(--label-w)); grid-auto-rows: var(--label-h); gap: var(--v-gap) var(--h-gap);}
+
+  .label{width:var(--label-w); height:var(--label-h); box-sizing:border-box; border:1px dashed transparent; border-radius:4mm; display:flex; align-items:center; justify-content:center; padding:0 4mm; position:relative;}
+  .label.show-guides{border-color:#e5e7eb}
+  .bar{position:absolute; inset:0; border-radius:4mm; opacity:.18}
+  .content{position:relative; text-align:center;}
+  .name{font-weight:700; font-size:14pt; line-height:1.05}
+  .region{font-size:9pt; color:#374151}
+  .ribbon{position:absolute; top:6px; right:-14px; transform:rotate(45deg); background:#ef4444; color:#fff; font-size:10px; font-weight:700; padding:4px 22px; box-shadow:0 2px 6px rgba(0,0,0,.15)}
+  .blend-outline{position:absolute; inset:0; border-radius:4mm; border:2px dotted #ef4444; pointer-events:none}
+
+  /* Print styles */
+  @media print{
+    @page{ size: A4; margin: 0 }
+    body{background:white}
+    header, .controls, .sheet-preview .note { display:none !important }
+    .sheet{box-shadow:none}
+    .label{border-color:transparent}
+  }
+
+  .regions{display:grid; grid-template-columns: 1fr auto auto; gap:6px; align-items:center}
+  .regions input[type=color]{width:44px; height:36px; padding:0; border:none; background:transparent}
+  .regions .del{color:#ef4444; border-color:#fecaca}
+  .scroll{max-height:280px; overflow:auto; border:1px dashed #e5e7eb; border-radius:10px; padding:10px}
+  .small{font-size:12px}
+</style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Spice Label Maker</h1>
+      <div class="sub">A4 Avery (UK) — alphabetical, colour‑coded by region, dotted borders for blends. Paste your list, set colours, and print.</div>
+    </div>
+  </header>
+
+  <div class="wrap grid">
+    <!-- LEFT: Data & settings -->
+    <section class="card">
+      <div class="hd"><h2>1) Paste your spices</h2><button class="btn" id="loadSample">Load sample</button></div>
+      <div class="bd">
+        <p class="small">Accepted formats: <strong>CSV</strong> (<code>Name,Region,Blend</code> with <code>Blend</code> = yes/no) or simple lines like <code>Turmeric | Indian | no</code>. One spice per line.</p>
+        <textarea id="input" placeholder="e.g.\nCumin, Indian, no\nHerbes de Provence, European, yes\nRas el Hanout, North African, yes\n..."></textarea>
+        <div class="row">
+          <button class="btn" id="parse">Parse & preview</button>
+          <button class="btn" id="downloadCSV">Download CSV</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="hd"><h2>2) Label sheet & appearance</h2><button class="btn ghost small" id="printBtn">Print</button></div>
+      <div class="bd">
+        <div class="row">
+          <label style="display:none">Sheet preset
+            <select id="preset">
+              <option value="L7160">Avery L7160 — 63.5 × 38.1 mm (21 per sheet)</option>
+              <option value="L7159">Avery L7159 — 63.5 × 33.9 mm (24 per sheet)</option>
+              <option value="L7163">Avery L7163 — 99.1 × 38.1 mm (14 per sheet)</option>
+            </select>
+          </label>
+          <label><input type="checkbox" id="showGuides" /> Show cut guides (on screen only)</label>
+          <label><input type="checkbox" id="showRegion" checked /> Show region under name</label>
+          <label><input type="checkbox" id="uppercase" /> Uppercase names</label>
+        </div>
+        <div class="row">
+          <label>Font size
+            <input type="number" id="fontSize" min="8" max="24" value="14" /> pt
+          </label>
+          <label>Bar opacity
+            <input type="number" id="barOpacity" min="0" max="1" step="0.05" value="0.18" />
+          </label>
+        </div>
+        <div class="row">
+          <label>Label width (mm)
+            <input type="number" id="w" value="63.5" step="0.1" min="10" />
+          </label>
+          <label>Label height (mm)
+            <input type="number" id="h" value="38.1" step="0.1" min="10" />
+          </label>
+          <label>H gap (mm)
+            <input type="number" id="hgap" value="3" step="0.1" min="0" />
+          </label>
+          <label>V gap (mm)
+            <input type="number" id="vgap" value="1" step="0.1" min="0" />
+          </label>
+          <label>Page margin X (mm)
+            <input type="number" id="mx" value="7.5" step="0.1" min="0" />
+          </label>
+          <label>Page margin Y (mm)
+            <input type="number" id="my" value="12" step="0.1" min="0" />
+          </label>
+        </div>
+        <hr style="border:none;border-top:1px solid #eee;margin:12px 0">
+        <h3 style="margin:.2rem 0 .6rem;font-size:14px">Region colours</h3>
+        <div class="scroll" id="regionList"></div>
+        <div class="row" style="margin-top:8px">
+          <input type="text" id="newRegionName" placeholder="Add region…" />
+          <input type="color" id="newRegionColour" value="#0ea5e9" />
+          <button class="btn" id="addRegion">Add</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- FULL-WIDTH PREVIEW -->
+    <section class="card" style="grid-column: 1 / -1">
+      <div class="hd"><h2>3) Preview & print</h2><span class="pill"><span id="count">0</span> labels</span></div>
+      <div class="bd">
+        <div class="sheet-preview">
+          <div id="sheets"></div>
+          <p class="note">Tip: In your browser’s print dialogue, set <strong>Paper size: A4</strong>, <strong>Margins: none</strong>, and disable any “fit to page” scaling so the mm sizes are accurate. Print a test page on plain paper first and hold it behind an actual label sheet to check alignment.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+<script>
+  // --- Avery presets (A4) ---
+  const PRESETS = {
+    L7160: { cols:3, rows:7, w:63.5, h:38.1, hgap:3, vgap:0, mx:7.5, my:12 },
+    L7159: { cols:3, rows:8, w:63.5, h:33.9, hgap:2.5, vgap:0, mx:7.5, my:13.5 },
+    L7163: { cols:2, rows:7, w:99.1, h:38.1, hgap:2.5, vgap:0, mx:8, my:12 }
+  };
+
+  // Default region colours
+  let regionColours = {
+    "Indian": "#f59e0b",
+    "Middle Eastern": "#ef4444",
+    "North African": "#10b981",
+    "East Asian": "#3b82f6",
+    "European": "#a855f7",
+    "Latin American": "#f97316",
+    "Other": "#94a3b8"
+  };
+
+  const state = { items: [] };
+
+  // Helpers
+  const el = (sel, p=document) => p.querySelector(sel);
+  const els = (sel, p=document) => [...p.querySelectorAll(sel)];
+  const mm = v => v.toFixed(2) + 'mm';
+
+  function parseInput(text){
+    const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const out = [];
+    for(const line of lines){
+      let name='', region='', blend='no';
+      // CSV or pipe‑separated
+      const parts = line.split(/\s*[\|,\t]\s*/);
+      if(parts.length===1){
+        name = parts[0]; region='Other'; blend='no';
+      }else{
+        [name, region, blend] = [parts[0]||'', parts[1]||'Other', (parts[2]||'no')];
+      }
+      if(!name) continue;
+      out.push({ name, region, blend: /^(y|yes|true|1)$/i.test(blend) });
+      // Seed region colour if unknown
+      if(region && !(region in regionColours)) regionColours[region] = '#94a3b8';
+    }
+    // sort A→Z by name
+    out.sort((a,b)=>a.name.localeCompare(b.name, 'en-GB'));
+    return out;
+  }
+
+  function renderRegionList(){
+    const box = el('#regionList');
+    box.innerHTML = '';
+    Object.entries(regionColours).forEach(([region, colour])=>{
+      const row = document.createElement('div');
+      row.className = 'regions';
+      row.innerHTML = `
+        <div>${region}</div>
+        <input type="color" value="${colour}" data-region="${region}">
+        <button class="btn del" data-del="${region}">Remove</button>
+      `;
+      box.appendChild(row);
+    });
+
+    box.addEventListener('input', (e)=>{
+      if(e.target.matches('input[type=color]')){
+        const r = e.target.dataset.region; regionColours[r] = e.target.value; render();
+      }
+    });
+    box.addEventListener('click', (e)=>{
+      if(e.target.dataset.del){ delete regionColours[e.target.dataset.del]; renderRegionList(); render(); }
+    });
+  }
+
+  function applyPreset(key){
+    const p = PRESETS[key];
+    document.documentElement.style.setProperty('--cols', p.cols);
+    document.documentElement.style.setProperty('--rows', p.rows);
+    document.documentElement.style.setProperty('--label-w', mm(p.w));
+    document.documentElement.style.setProperty('--label-h', mm(p.h));
+    document.documentElement.style.setProperty('--h-gap', mm(p.hgap));
+    document.documentElement.style.setProperty('--v-gap', mm(p.vgap));
+    document.documentElement.style.setProperty('--page-mx', mm(p.mx));
+    document.documentElement.style.setProperty('--page-my', mm(p.my));
+  }
+
+  function computeGrid(){
+    const get = id => parseFloat(el('#'+id).value);
+    const w = get('w')||63.5, h = get('h')||38.1;
+    const hgap = get('hgap')||3, vgap = get('vgap')||1;
+    const mx = get('mx')||7.5, my = get('my')||12;
+
+    const pageW = 210 - (mx*2);
+    const pageH = 297 - (my*2);
+
+    const cols = Math.max(1, Math.floor((pageW + hgap) / (w + hgap)));
+    const rows = Math.max(1, Math.floor((pageH + vgap) / (h + vgap)));
+
+    document.documentElement.style.setProperty('--cols', cols);
+    document.documentElement.style.setProperty('--rows', rows);
+    document.documentElement.style.setProperty('--label-w', mm(w));
+    document.documentElement.style.setProperty('--label-h', mm(h));
+    document.documentElement.style.setProperty('--h-gap', mm(hgap));
+    document.documentElement.style.setProperty('--v-gap', mm(vgap));
+    document.documentElement.style.setProperty('--page-mx', mm(mx));
+    document.documentElement.style.setProperty('--page-my', mm(my));
+
+    return {cols, rows};
+  }
+
+  function chunk(arr, size){
+    const res=[]; for(let i=0;i<arr.length;i+=size) res.push(arr.slice(i,i+size)); return res;
+  }
+
+  function render(){
+    const sheetsBox = el('#sheets');
+    sheetsBox.innerHTML = '';
+
+    const {cols, rows} = computeGrid();
+    const perSheet = cols * rows;
+    const items = state.items;
+    el('#count').textContent = items.length;
+
+    const pages = chunk(items, perSheet);
+    pages.forEach(page => {
+      const sheet = document.createElement('div');
+      sheet.className = 'sheet';
+      const canvas = document.createElement('div');
+      canvas.className = 'canvas';
+      sheet.appendChild(canvas);
+
+      page.forEach(item => {
+        const label = document.createElement('div');
+        label.className = 'label';
+        if(el('#showGuides').checked) label.classList.add('show-guides');
+        
+
+        const content = document.createElement('div');
+        content.className = 'content';
+        const name = document.createElement('div');
+        name.className = 'name';
+        name.style.fontSize = (parseInt(el('#fontSize').value)||14) + 'pt';
+        name.textContent = el('#uppercase').checked ? item.name.toUpperCase() : item.name;
+        content.appendChild(name);
+        if(el('#showRegion').checked){
+          const region = document.createElement('div');
+          region.className = 'region';
+          region.textContent = item.region;
+          const col = regionColours[item.region] || '#94a3b8';
+          region.style.position = 'relative';
+          region.style.zIndex = '1';
+          region.style.color = '#111827';
+          region.style.fontWeight = '600';
+          region.style.boxShadow = 'inset 0 -8px 0 0 ' + col;
+          content.appendChild(region);
+        }
+        label.appendChild(content);
+        if(item.blend){
+          const ribbon = document.createElement('div');
+          ribbon.className = 'ribbon';
+          ribbon.textContent = 'BLEND';
+          label.appendChild(ribbon);
+          const dotted = document.createElement('div'); dotted.className='blend-outline'; label.appendChild(dotted);
+        }
+        canvas.appendChild(label);
+      });
+
+      sheetsBox.appendChild(sheet);
+    });
+  }
+
+  // Event wiring
+  el('#parse').addEventListener('click', ()=>{
+    state.items = parseInput(el('#input').value);
+    renderRegionList();
+    render();
+  });
+
+  el('#preset').addEventListener('change', render);
+  el('#showGuides').addEventListener('change', render);
+  el('#showRegion').addEventListener('change', render);
+  el('#uppercase').addEventListener('change', render);
+  el('#fontSize').addEventListener('input', render);
+  el('#barOpacity').addEventListener('input', render);
+  ;['w','h','hgap','vgap','mx','my'].forEach(id=> el('#'+id).addEventListener('input', render));
+
+  el('#addRegion').addEventListener('click', ()=>{
+    const name = el('#newRegionName').value.trim();
+    const colour = el('#newRegionColour').value;
+    if(!name) return; regionColours[name] = colour; el('#newRegionName').value=''; renderRegionList(); render();
+  });
+
+  el('#downloadCSV').addEventListener('click', ()=>{
+    const rows = [['Name','Region','Blend'], ...state.items.map(i=>[i.name,i.region,i.blend?'yes':'no'])];
+    const csv = rows.map(r=>r.map(v=>(/[,\"]/.test(v)? '"'+String(v).replace(/"/g,'""')+'"' : v)).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'spices.csv'; a.click(); URL.revokeObjectURL(a.href);
+  });
+
+  el('#printBtn').addEventListener('click', ()=>{ window.print(); });
+
+  // Sample dataset (roughly 30 to get you started; paste your 54 to replace)
+  const SAMPLE = `Cumin, Indian, no\nTurmeric, Indian, no\nGaram Masala, Indian, yes\nCoriander Seed, Indian, no\nFenugreek, Indian, no\nCardamom, Indian, no\nCinnamon, Middle Eastern, no\nSumac, Middle Eastern, no\nZa'atar, Middle Eastern, yes\nBaharat, Middle Eastern, yes\nRas el Hanout, North African, yes\nHarissa, North African, yes\nPaprika (Sweet), European, no\nSmoked Paprika, European, no\nHerbes de Provence, European, yes\nOregano, European, no\nBasil, European, no\nThyme, European, no\nChinese Five Spice, East Asian, yes\nSichuan Pepper, East Asian, no\nStar Anise, East Asian, no\nGochugaru, East Asian, no\nAncho Chilli, Latin American, no\nChipotle, Latin American, no\nMexican Oregano, Latin American, no\nMixed Spice, Other, yes\nAllspice, Other, no\nNutmeg, Other, no\nCloves, Other, no\nBlack Pepper, Other, no`;
+
+  el('#loadSample').addEventListener('click', ()=>{
+    el('#input').value = SAMPLE; el('#parse').click();
+  });
+
+  // Initial render
+  renderRegionList();
+  render();
+</script>
+</body>
+</html>
+
